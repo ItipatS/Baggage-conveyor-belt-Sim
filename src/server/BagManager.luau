@@ -2,6 +2,7 @@
 
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 --Config
@@ -9,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 local INTERVAL:number = 1
 local SPAWNPOINT:Vector3 = Vector3.new(1, 5, 1)
 local BAGFOLDER:Folder = nil
+local BAGSIZE:Vector3 = Vector3.new(3,2,4)
 
 local MATERIALS = {
     Enum.Material.Plastic,
@@ -32,6 +34,7 @@ local Bags: {[Instance]: {
     Material: Enum.Material,
     Distance: number, -- how far along belt (studs)
     SpawnedAt: number,
+    State: "Spawning" | "Moving" | "Deleting"
 }} = {}
 
 local BagManager = {}
@@ -42,6 +45,44 @@ local HeartbeatConn: RBXScriptConnection? = nil
 
 local function pickRandom<T>(list: {T}): T
     return list[math.random(#list)]
+end
+
+
+local function tween(inst, info, props)
+    local t = TweenService:Create(inst, info, props)
+    t:Play()
+    return t
+end
+
+local function PlaySpawnVfx(bag: BasePart, baseCFrame: CFrame, onDone: () -> ())
+    -- Start above + tiny + invisible
+    bag.Transparency = 1
+    bag.CFrame = baseCFrame * CFrame.new(0, 6, 0)
+    bag.Size = Vector3.new(0.5, 0.5, 0.5)
+
+    -- Phase 1: appear + overshoot scale
+    local t1 = tween(bag, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Transparency = 0,
+        Size = BAGSIZE * 1.12,
+    })
+
+    t1.Completed:Once(function()
+        -- Phase 2: settle size (little shrink bounce)
+        local t2 = tween(bag, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = BAGSIZE,
+        })
+
+        -- Phase 3: drop onto belt with bounce
+        local dropTo = baseCFrame * CFrame.new(0, 2, 0)
+        local t3 = tween(bag, TweenInfo.new(0.3, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
+            CFrame = dropTo,
+        })
+
+        -- finish when drop completes (size settle might finish earlier, that’s fine)
+        t3.Completed:Once(function()
+            if onDone then onDone() end
+        end)
+    end)
 end
 
 local function SpawnBag()
@@ -58,13 +99,13 @@ local function SpawnBag()
     bag.Anchored =  true -- kinematic movement
     bag.Color = color
     bag.Material = material
-    bag.Parent = BAGFOLDER
+    
 
      -- Spawn slightly above belt at start
     local spawnCFrame = conveyor.StartCFrame * CFrame.new(0, 3, 0)
     bag.CFrame = spawnCFrame
-    bag.Parent = Workspace
-
+    bag.Parent = BAGFOLDER
+    
     bag:SetAttribute("BagId", bagId)
     
     Bags[bag] = {
@@ -73,7 +114,14 @@ local function SpawnBag()
         Material = material,
         Distance = 0,
         SpawnedAt = os.clock(),
+        State = "Spawning"
     }
+
+    --play animation!
+    PlaySpawnVfx(bag, conveyor.StartCFrame, function()
+        local meta = Bags[bag]
+        if meta then meta.State = "Moving" end
+    end)
 end
 
 local function DestroyBag(bag: Instance)
@@ -85,7 +133,8 @@ function BagManager.Init(spec)
     conveyor = spec
 
     --Initialize BAGFOLDER
-    BAGFOLDER = Workspace:FindFirstChild("Bags") or Instance.new("Folder", Workspace)
+    BAGFOLDER = Workspace:FindFirstChild("Bags") or Instance.new("Folder")
+    BAGFOLDER.Parent = Workspace
     BAGFOLDER.Name = "Bags"
 
     -- prevent double init
@@ -106,11 +155,13 @@ function BagManager.Init(spec)
                 continue
             end
 
-            meta.Distance += conveyor.Speed * dt
+            if meta.State == "Moving" then
+                meta.Distance += conveyor.Speed * dt
 
-            -- compute new position: start + dir * distance (+ vertical offset)
-            local pos = conveyor.StartCFrame.Position + conveyor.Direction * meta.Distance + Vector3.new(0, 2, 0)
-            bag.Position = pos
+                -- compute new position: start + dir * distance (+ vertical offset)
+                local pos = conveyor.StartCFrame.Position + conveyor.Direction * meta.Distance + Vector3.new(0, 2, 0)
+                bag.Position = pos
+            end
 
             if meta.Distance >= conveyor.Length then
                 DestroyBag(bag)
