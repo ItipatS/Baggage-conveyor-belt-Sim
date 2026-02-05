@@ -1,1 +1,1 @@
-print("Hello world, from server!")
+local BagManager = require(script.BagManager)
