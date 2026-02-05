@@ -19,6 +19,9 @@ frame-rate independent timing. Each bag is assigned a unique BagId on spawn. In 
 implementation, bags are left unanchored to validate visuals and interaction flow early;
 this is intentionally temporary and revisited once conveyor motion is finalized.
 
+Bags are registered in a server-side table keyed by instance, allowing metadata
+to be tracked independently of the visual representation. Attributes are used only
+for data that must be read by clients (BagId).
 
 ## Alternatives Considered
 - Physics conveyor (rejected for perf + nondeterminism)
