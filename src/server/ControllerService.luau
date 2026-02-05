@@ -31,6 +31,10 @@ function ControllerService.Init(externalApi)
     SetSpawnInterval.Name = "SetSpawnInterval"
     SetSpawnInterval.Parent = remotes
 
+    local BagClicked = remotes:FindFirstChild("BagClicked") or Instance.new("RemoteEvent")
+    BagClicked.Name = "BagClicked"
+    BagClicked.Parent = remotes
+
     -- choose controller
     Players.PlayerAdded:Connect(function(plr)
         if not controller then
@@ -48,6 +52,20 @@ function ControllerService.Init(externalApi)
 
         api.SetInterval(interval) -- BagManager clamps internally
     end)
+
+    BagClicked.OnServerEvent:Connect(function(plr, part)
+        if typeof(part) ~= "Instance" then return end
+        if not part:IsA("BasePart") then return end
+        if not part:IsDescendantOf(workspace) then return end
+
+        local bagId = part:GetAttribute("BagId")
+        if typeof(bagId) ~= "string" then return end
+
+        if api.IsBag and not api.IsBag(part) then return end
+
+        print(("[SERVER] %s clicked BagId: %s"):format(plr.Name, bagId))
+    end)
+
 end
 
 return ControllerService

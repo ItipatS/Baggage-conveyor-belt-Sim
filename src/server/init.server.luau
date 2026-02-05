@@ -1,8 +1,5 @@
 -- ServerScriptService/server/ServerInit.server.lua
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local ConveyorManager = require(script.ConveyorManager)
 local BagManager = require(script.BagManager)
 local ControllerService  = require(script.ControllerService)
@@ -13,4 +10,5 @@ BagManager.Init(spec)
 -- Init ControllerService + set api
 ControllerService.Init({
     SetInterval = BagManager.SetInterval,
+    IsBag = BagManager.IsBag,
 })

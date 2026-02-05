@@ -124,4 +124,8 @@ function BagManager.SetInterval(seconds: number)
     INTERVAL = math.clamp(seconds, 0.1, 5.0)
 end
 
+function BagManager.IsBag(part: Instance): boolean
+    return Bags[part] ~= nil
+end
+
 return BagManager

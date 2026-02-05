@@ -1,4 +1,4 @@
--- StarterPlayerScripts/ControllerUI.client.lua
+-- StarterPlayerScripts/client/ControllerUI.luau
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
