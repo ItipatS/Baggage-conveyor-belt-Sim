@@ -26,6 +26,12 @@ local COLORS = {
 
 -- State
 local acc:number = 0
+local Bags: {[Instance]: {
+    BagId: string,
+    Color: Color3,
+    Material: Enum.Material,
+    SpawnedAt: number,
+}} = {}
 
 local BagManager = {}
 
@@ -52,6 +58,13 @@ local function SpawnBag()
     bag.Parent = BAGFOLDER
 
     bag:SetAttribute("BagId", bagId)
+    
+    Bags[bag] = {
+        BagId = bagId,
+        Color = color,
+        Material = material,
+        SpawnedAt = os.clock(),
+    }
 end
 
 RunService.Heartbeat:Connect(function(dt)
