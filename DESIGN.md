@@ -29,7 +29,12 @@ The implementation is intentionally minimal and framework-free to keep scope tig
 
 ## High-Level Architecture
 
-### Conveyor-first world definition
+### Composition root (ServerscriptService/server/init.server.luau)
+`MainServerscript` acts as the composition root: it wires core systems together exactly once at startup.
+This keeps gameplay modules focused on their domain logic, and keeps dependency direction clear.
+
+
+### Conveyor-first initialization
 The conveyor is created first and defines the system’s coordinate frame:
 - Start position (origin)
 - Direction vector (forward axis)
@@ -51,6 +56,28 @@ This avoids hardcoding spawn points and keeps the bag system dependent on a sing
   - movement along conveyor
   - deletion at end
 - Depends only on `ConveyorSpec` (no circular dependencies).
+
+## Dependency Injection Boundary (ControllerService)
+Client-facing networking (RemoteEvents, controller selection, request validation) is isolated in
+`ControllerService`. Instead of requiring `BagManager` directly inside this module, `ControllerService`
+receives a small injected API surface from the composition root.
+
+Example injected API:
+- `SetInterval(seconds)` — update spawn interval (server-authoritative, clamped)
+- `IsBag(instance)` — optional validation hook for click events
+
+This keeps networking concerns separate from gameplay logic and prevents a monolithic bootstrap script.
+It also keeps the dependency direction one-way: "remotes → gameplay API", rather than coupling gameplay
+modules to networking implementation details.
+
+### Remote ownership and authorization
+RemoteEvents are created and owned server-side by `ControllerService`. This module is also responsible for:
+- selecting a single "controller" player who is allowed to change spawn interval
+- validating client requests (type checks, authorization checks, server-side clamping)
+- routing validated requests to the injected gameplay API
+
+`BagManager` does not know about remotes or player authorization rules; it only exposes gameplay functions.
+
 
 ---
 
