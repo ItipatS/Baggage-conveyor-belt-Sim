@@ -3,6 +3,7 @@
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 --Config
 --Constaints
@@ -72,6 +73,8 @@ local function publishConveyorSpec(spec)
 
     specFolder:SetAttribute("Length", spec.Length)
     specFolder:SetAttribute("Speed", spec.Speed)
+
+    specFolder:SetAttribute("Ready", true)
 end
 
 local function SpawnBagRecord()
@@ -86,7 +89,7 @@ local function SpawnBagRecord()
     record.Parent = BAGFOLDER
 
     record:SetAttribute("BagId", bagId)
-    record:SetAttribute("SpawnT", os.clock())
+    record:SetAttribute("SpawnT", Workspace:GetServerTimeNow())
     record:SetAttribute("Mat", material.Name)
 
     -- store Color3 as numbers
@@ -122,7 +125,7 @@ function BagManager.Init(spec)
         end
         deleteAcc -= DELETE_TICK
 
-        local now = os.clock()
+        local now = Workspace:GetServerTimeNow()
         for _, record in ipairs(BAGFOLDER:GetChildren()) do
             local spawnT = record:GetAttribute("SpawnT")
             if typeof(spawnT) ~= "number" then

@@ -23,6 +23,11 @@ local function tween(inst, info, props)
 end
 
 local function readSpec()
+
+    while SpecFolder:GetAttribute("Ready") ~= true do
+        task.wait()
+    end
+    
     local sx = SpecFolder:GetAttribute("StartX") or 0
     local sy = SpecFolder:GetAttribute("StartY") or 0
     local sz = SpecFolder:GetAttribute("StartZ") or 0
@@ -36,7 +41,6 @@ local function readSpec()
     local dir = Vector3.new(dx, dy, dz)
     if dir.Magnitude < 1e-6 then dir = Vector3.new(0, 0, 1) end
     dir = dir.Unit
-
     return start, dir, len, speed
 end
 
@@ -75,6 +79,7 @@ local function playDespawnVfx(bag: BasePart, onDone: () -> ())
 end
 
 local function makeVisual(record: Instance): BasePart
+
     local part = Instance.new("Part")
     part.Name = "Bag"
     part.Anchored = true
@@ -125,7 +130,7 @@ end)
 
 RunService.RenderStepped:Connect(function(dt)
     local start, dir, _, speed = readSpec()
-    local now = os.clock()
+    local now = Workspace:GetServerTimeNow()
 
     for record, part in pairs(visualsByRecord) do
         if not record.Parent then
