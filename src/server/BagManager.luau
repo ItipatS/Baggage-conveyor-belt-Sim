@@ -85,6 +85,24 @@ local function PlaySpawnVfx(bag: BasePart, baseCFrame: CFrame, onDone: () -> ())
     end)
 end
 
+local function PlayDespawnVfx(bag: BasePart, onDone: () -> ())
+    local up = bag.CFrame * CFrame.new(0, 3, 0)
+
+    local t1 = tween(bag, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        CFrame = up,
+    })
+
+    t1.Completed:Once(function()
+        local t2 = tween(bag, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = bag.Size * 0.05,
+            Transparency = 1,
+        })
+        t2.Completed:Once(function()
+            if onDone then onDone() end
+        end)
+    end)
+end
+
 local function SpawnBag()
     assert(conveyor, "BagManager not initialized with conveyor spec")
 
@@ -105,7 +123,7 @@ local function SpawnBag()
     local spawnCFrame = conveyor.StartCFrame * CFrame.new(0, 3, 0)
     bag.CFrame = spawnCFrame
     bag.Parent = BAGFOLDER
-    
+
     bag:SetAttribute("BagId", bagId)
     
     Bags[bag] = {
@@ -163,8 +181,11 @@ function BagManager.Init(spec)
                 bag.Position = pos
             end
 
-            if meta.Distance >= conveyor.Length then
-                DestroyBag(bag)
+            if meta.State == "Moving" and meta.Distance >= conveyor.Length then
+                meta.State = "Deleting"
+                PlayDespawnVfx(bag, function()
+                    DestroyBag(bag)
+                end)
             end
         end
     end)
