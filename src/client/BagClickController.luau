@@ -1,4 +1,4 @@
--- StarterPlayerScripts/client/BagClick.luau
+-- StarterPlayerScripts/client/BagClickController.luau
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -49,6 +49,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     print(("[CLIENT] BagId: %s"):format(bagId))
 
     -- Server requirement: notify server (send the instance)
-    BagClicked:FireServer(part)
+    BagClicked:FireServer(bagId)
 end)
 return {}

@@ -53,14 +53,10 @@ function ControllerService.Init(externalApi)
         api.SetInterval(interval) -- BagManager clamps internally
     end)
 
-    BagClicked.OnServerEvent:Connect(function(plr, part)
-        if typeof(part) ~= "Instance" then return end
-        if not part:IsA("BasePart") then return end
-        if not part:IsDescendantOf(workspace) then return end
+    BagClicked.OnServerEvent:Connect(function(plr, bagId)
 
-        local bagId = part:GetAttribute("BagId")
         if typeof(bagId) ~= "string" then return end
-
+        
         if api.IsBagId and not api.IsBagId(bagId) then return end
 
         print(("[SERVER] %s clicked BagId: %s"):format(plr.Name, bagId))
