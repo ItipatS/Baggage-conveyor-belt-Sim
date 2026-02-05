@@ -45,6 +45,20 @@ function ControllerService.Init(externalApi)
         end
     end)
 
+    Players.PlayerRemoving:Connect(function(plr)
+        if plr == controller then
+            controller = nil
+            -- pick a new controller if possible
+            for _, other in pairs(Players:GetPlayers()) do
+                if other ~= plr then
+                    controller = other
+                    SetController:FireClient(other, true)
+                    break
+                end
+            end
+        end
+    end)
+
     -- validate interval requests
     SetSpawnInterval.OnServerEvent:Connect(function(plr, interval)
         if plr ~= controller then return end
