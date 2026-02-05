@@ -119,7 +119,7 @@ function BagManager.Init(spec)
     end)
 end
 
---API
+--API for set bag spawn interval from anywhere
 function BagManager.SetInterval(seconds: number)
     INTERVAL = math.clamp(seconds, 0.1, 5.0)
 end

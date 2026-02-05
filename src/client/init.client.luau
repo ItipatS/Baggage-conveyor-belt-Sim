@@ -1,1 +1,1 @@
-print("Hello world, from client!")
+local ControllerUI = require(script:WaitForChild("ControllerUI"))
