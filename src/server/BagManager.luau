@@ -2,15 +2,13 @@
 
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Config
 --Constaints
 local INTERVAL:number = 1
-local SPAWNPOINT:Vector3 = Vector3.new(1, 5, 1)
 local BAGFOLDER:Folder = nil
-local BAGSIZE:Vector3 = Vector3.new(3,2,4)
+local DELETE_TICK = 0.1 -- 10Hz
 
 local MATERIALS = {
     Enum.Material.Plastic,
@@ -28,164 +26,102 @@ local COLORS = {
 
 -- State
 local acc:number = 0
-local Bags: {[Instance]: {
-    BagId: string,
-    Color: Color3,
-    Material: Enum.Material,
-    Distance: number, -- how far along belt (studs)
-    SpawnedAt: number,
-    State: "Spawning" | "Moving" | "Deleting"
-}} = {}
+local deleteAcc = 0
 
 local BagManager = {}
 
 local conveyor = nil
 local HeartbeatConn: RBXScriptConnection? = nil
 
-
 local function pickRandom<T>(list: {T}): T
     return list[math.random(#list)]
 end
 
-
-local function tween(inst, info, props)
-    local t = TweenService:Create(inst, info, props)
-    t:Play()
-    return t
+local function getOrCreateFolder(parent: Instance, name: string): Folder
+    local f = parent:FindFirstChild(name)
+    if not f then
+        f = Instance.new("Folder")
+        f.Name = name
+        f.Parent = parent
+    end
+    return f :: Folder
 end
 
-local function PlaySpawnVfx(bag: BasePart, baseCFrame: CFrame, onDone: () -> ())
-    -- Start above + tiny + invisible
-    bag.Transparency = 1
-    bag.CFrame = baseCFrame * CFrame.new(0, 6, 0)
-    bag.Size = Vector3.new(0.5, 0.5, 0.5)
+local function publishConveyorSpec(spec)
+    local specFolder = getOrCreateFolder(ReplicatedStorage, "ConveyorSpec")
+    local startPos = spec.StartCFrame.Position
+    local dir = spec.Direction
 
-    -- Phase 1: appear + overshoot scale
-    local t1 = tween(bag, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Transparency = 0,
-        Size = BAGSIZE * 1.12,
-    })
+    specFolder:SetAttribute("StartX", startPos.X)
+    specFolder:SetAttribute("StartY", startPos.Y)
+    specFolder:SetAttribute("StartZ", startPos.Z)
 
-    t1.Completed:Once(function()
-        -- Phase 2: settle size (little shrink bounce)
-        local t2 = tween(bag, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = BAGSIZE,
-        })
+    specFolder:SetAttribute("DirX", dir.X)
+    specFolder:SetAttribute("DirY", dir.Y)
+    specFolder:SetAttribute("DirZ", dir.Z)
 
-        -- Phase 3: drop onto belt with bounce
-        local dropTo = baseCFrame * CFrame.new(0, 2, 0)
-        local t3 = tween(bag, TweenInfo.new(0.3, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
-            CFrame = dropTo,
-        })
-
-        -- finish when drop completes (size settle might finish earlier, that’s fine)
-        t3.Completed:Once(function()
-            if onDone then onDone() end
-        end)
-    end)
+    specFolder:SetAttribute("Length", spec.Length)
+    specFolder:SetAttribute("Speed", spec.Speed)
 end
 
-local function PlayDespawnVfx(bag: BasePart, onDone: () -> ())
-    local up = bag.CFrame * CFrame.new(0, 3, 0)
-
-    local t1 = tween(bag, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        CFrame = up,
-    })
-
-    t1.Completed:Once(function()
-        local t2 = tween(bag, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = bag.Size * 0.05,
-            Transparency = 1,
-        })
-        t2.Completed:Once(function()
-            if onDone then onDone() end
-        end)
-    end)
-end
-
-local function SpawnBag()
+local function SpawnBagRecord()
     assert(conveyor, "BagManager not initialized with conveyor spec")
 
-    local bagId  = HttpService:GenerateGUID(false)
+    local bagId = HttpService:GenerateGUID(false)
     local color = pickRandom(COLORS)
     local material = pickRandom(MATERIALS)
 
-    local bag = Instance.new("Part")
-    bag.Name = "Bag"
-    bag.Size = Vector3.new(3,2,4)
-    bag.Position = SPAWNPOINT
-    bag.Anchored =  true -- kinematic movement
-    bag.Color = color
-    bag.Material = material
-    
+    local record = Instance.new("Folder")
+    record.Name = bagId
+    record.Parent = BAGFOLDER
 
-     -- Spawn slightly above belt at start
-    local spawnCFrame = conveyor.StartCFrame * CFrame.new(0, 3, 0)
-    bag.CFrame = spawnCFrame
-    bag.Parent = BAGFOLDER
+    record:SetAttribute("BagId", bagId)
+    record:SetAttribute("SpawnT", os.clock())
+    record:SetAttribute("Mat", material.Name)
 
-    bag:SetAttribute("BagId", bagId)
-    
-    Bags[bag] = {
-        BagId = bagId,
-        Color = color,
-        Material = material,
-        Distance = 0,
-        SpawnedAt = os.clock(),
-        State = "Spawning"
-    }
-
-    --play animation!
-    PlaySpawnVfx(bag, conveyor.StartCFrame, function()
-        local meta = Bags[bag]
-        if meta then meta.State = "Moving" end
-    end)
-end
-
-local function DestroyBag(bag: Instance)
-    Bags[bag] = nil
-    bag:Destroy()
+    -- store Color3 as numbers
+    record:SetAttribute("R", color.R)
+    record:SetAttribute("G", color.G)
+    record:SetAttribute("B", color.B)
 end
 
 function BagManager.Init(spec)
     conveyor = spec
+    publishConveyorSpec(spec)
 
-    --Initialize BAGFOLDER
-    BAGFOLDER = Workspace:FindFirstChild("Bags") or Instance.new("Folder")
-    BAGFOLDER.Parent = Workspace
-    BAGFOLDER.Name = "Bags"
+    -- Replicated bag records folder
+    BAGFOLDER = getOrCreateFolder(ReplicatedStorage, "Bags")
 
-    -- prevent double init
-    if HeartbeatConn then HeartbeatConn:Disconnect() end
+    if HeartbeatConn then
+        HeartbeatConn:Disconnect()
+        HeartbeatConn = nil
+    end
 
     HeartbeatConn = RunService.Heartbeat:Connect(function(dt)
-        -- spawn loop
+        -- spawn loop (unchanged)
         acc += dt
         while acc >= INTERVAL do
             acc -= INTERVAL
-            SpawnBag()
+            SpawnBagRecord()
         end
 
-        -- move loop
-        for bag, meta in pairs(Bags) do
-            if not bag.Parent then
-                Bags[bag] = nil
+        -- delete loop (10Hz)
+        deleteAcc += dt
+        if deleteAcc < DELETE_TICK then
+            return
+        end
+        deleteAcc -= DELETE_TICK
+
+        local now = os.clock()
+        for _, record in ipairs(BAGFOLDER:GetChildren()) do
+            local spawnT = record:GetAttribute("SpawnT")
+            if typeof(spawnT) ~= "number" then
                 continue
             end
 
-            if meta.State == "Moving" then
-                meta.Distance += conveyor.Speed * dt
-
-                -- compute new position: start + dir * distance (+ vertical offset)
-                local pos = conveyor.StartCFrame.Position + conveyor.Direction * meta.Distance + Vector3.new(0, 2, 0)
-                bag.Position = pos
-            end
-
-            if meta.State == "Moving" and meta.Distance >= conveyor.Length then
-                meta.State = "Deleting"
-                PlayDespawnVfx(bag, function()
-                    DestroyBag(bag)
-                end)
+            local dist = (now - spawnT) * conveyor.Speed
+            if dist >= conveyor.Length then
+                record:Destroy()
             end
         end
     end)
@@ -196,8 +132,9 @@ function BagManager.SetInterval(seconds: number)
     INTERVAL = math.clamp(seconds, 0.1, 5.0)
 end
 
-function BagManager.IsBag(part: Instance): boolean
-    return Bags[part] ~= nil
+function BagManager.IsBagId(bagId: string): boolean
+    if typeof(bagId) ~= "string" then return false end
+    return BAGFOLDER:FindFirstChild(bagId) ~= nil
 end
 
 return BagManager

@@ -10,5 +10,5 @@ BagManager.Init(spec)
 -- Init ControllerService + set api
 ControllerService.Init({
     SetInterval = BagManager.SetInterval,
-    IsBag = BagManager.IsBag,
+    IsBagId = BagManager.IsBagId,
 })

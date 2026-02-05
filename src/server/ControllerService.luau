@@ -61,7 +61,7 @@ function ControllerService.Init(externalApi)
         local bagId = part:GetAttribute("BagId")
         if typeof(bagId) ~= "string" then return end
 
-        if api.IsBag and not api.IsBag(part) then return end
+        if api.IsBagId and not api.IsBagId(bagId) then return end
 
         print(("[SERVER] %s clicked BagId: %s"):format(plr.Name, bagId))
     end)
