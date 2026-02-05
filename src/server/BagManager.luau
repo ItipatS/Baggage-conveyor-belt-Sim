@@ -10,19 +10,21 @@ local INTERVAL:number = 1
 local BAGFOLDER:Folder = nil
 local DELETE_TICK = 0.1 -- 10Hz
 
-local MATERIALS = {
-    Enum.Material.Plastic,
-    Enum.Material.SmoothPlastic,
-    Enum.Material.Metal,
-    Enum.Material.Fabric,
+local MATERIALS = Enum.Material:GetEnumItems() -- all materials
+local IgnoreMaterials = {
+    Enum.Material.Air; Enum.Material.Water;
+    Enum.Material.Rock; Enum.Material.Asphalt;
+    Enum.Material.Snow; Enum.Material.Glacier;
+    Enum.Material.Sandstone; Enum.Material.Mud;
+    Enum.Material.Basalt; Enum.Material.Ground;
+    Enum.Material.CrackedLava; Enum.Material.Salt;
+    Enum.Material.LeafyGrass; Enum.Material.Limestone;
+    Enum.Material.Pavement;
 }
 
-local COLORS = {
-    Color3.fromRGB(255, 80, 80),
-    Color3.fromRGB(80, 255, 80),
-    Color3.fromRGB(80, 80, 255),
-    Color3.fromRGB(255, 220, 80),
-}
+for _, material in next, IgnoreMaterials do -- Removing unusable materials
+    table.remove(MATERIALS, table.find(MATERIALS, material))
+end
 
 -- State
 local acc:number = 0
@@ -35,6 +37,14 @@ local HeartbeatConn: RBXScriptConnection? = nil
 
 local function pickRandom<T>(list: {T}): T
     return list[math.random(#list)]
+end
+
+local function pickRandomColor(): Color3
+    return Color3.fromRGB(
+        math.random(0, 255),
+        math.random(0, 255),
+        math.random(0, 255)
+    )
 end
 
 local function getOrCreateFolder(parent: Instance, name: string): Folder
@@ -68,7 +78,7 @@ local function SpawnBagRecord()
     assert(conveyor, "BagManager not initialized with conveyor spec")
 
     local bagId = HttpService:GenerateGUID(false)
-    local color = pickRandom(COLORS)
+    local color = pickRandomColor()
     local material = pickRandom(MATERIALS)
 
     local record = Instance.new("Folder")
